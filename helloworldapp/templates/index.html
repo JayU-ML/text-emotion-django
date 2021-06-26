@@ -1,0 +1,529 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="Content-Style-Type" content="text/css">
+    <meta http-equiv="Content-Script-Type" content="text/javascript">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>音声文字起こし+文字から感情分析</title>
+
+    <!-- JS/CSSの読み込み -->
+    <script type="text/javascript" src="{% static '/js/recorder.js' %}"></script>
+    <script type="text/javascript" src="{% static '/js/wrp.js' %}"></script>
+    <link rel="stylesheet" href="{% static '/css/index.css' %}">
+</head>
+
+<body lang="ja">
+
+    <!-- 説明等 -->
+    <h1>音声文字起こし+文字から感情分析 (担当:じゅんじゅん)</h1>
+
+    <p>1. 録音ボタンを押すと音声認識を開始する(※うまくいかない人はもしかしたらブラウザの設定でマイクを許可してないかもしれません)</p>
+    <p>2. 録音ボタンを再度押すと音声認識を終了する</p>
+    <p>3. 認識を終了した段階でaxios非同期処理でサーバーに文字データが送られる</p>
+    <p>4. 送られたデータはPythonで処理され、すぐさま感情分析結果の値が返ってくる</p>
+    <br>
+    <p>※もし余地があれば字幕も、とのことで</p>
+    <p>※↓テーブル消す努力をしております。なぜかうまくいかないのです</p>
+
+    <!-- ================================ 必要情報のテーブル (消したい) ================================ -->
+    <table border="0" width="100%" cellspacing="3" cellpadding="0">
+        <tr>
+            <td width="240">&nbsp;サーバ URL</td>
+            <td><input type="text" class="text" id="serverURL" spellcheck="false" tabindex="3"></td>
+        </tr>
+        <tr>
+            <td width="240">&nbsp;接続エンジン名</td>
+            <td><input type="text" class="text grammarFileNames" spellcheck="false" tabindex="3"></td>
+        </tr>
+        <tr>
+            <td width="240">&nbsp;APPKEY</td>
+            <td><input type="text" class="text" id="authorization" spellcheck="false" tabindex="3"></td>
+        </tr>
+        <tr>
+            <td width="240">
+                <button class="text" id="resumePauseButton" tabindex="5">録音の開始</button>
+            </td>
+            <td class="recognitionResult">
+                <span class="recognitionResultText"></span><span class="recognitionResultInfo"></span>
+            </td>
+        </tr>
+    </table>
+
+
+    <br><br>
+    <h2 id="status">Ajax/axios通信が完了するとここが「axios通信OK!」に変わる</h2>
+
+    <p>===============================================================</p>
+
+    <h2>↓感情分析終了後、返ってくる値(JSON形式 ※もしフロント側の方で形式を他に指定したい場合はじゅんじゅんまでお知らせください)</h2>
+    <h3>{{data_explain}}</h3>
+    <br>
+    <h3>説明:</h3>
+    <h3>magnitude: 感情の強さ(0.0 ~ 5.0)</h3>
+    <h3>score: 哀楽(-1.0 ~ 1.0)</h3>
+    <h3>シンプルに score × magnitude すればよくねとかおもっちゃいました</h3>
+
+    <!-- ================================ ライブラリの読み込み ================================ -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <script type="text/javascript">
+
+        // ================================ 音声の文字書き起こし処理 ================================
+        (function () {
+            function sanitize_(s) {
+                return s.replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/'/g, '&apos;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            // 「buffer」が書き起こした文字
+            let buffer;
+            let bufferEnding;
+
+            // ここからは理解できないが、いい感じに文章、音節ごとに区切って検出する技が書かれている
+            function append_(item) {
+                if (item.length == 0) {
+                    return;
+                }
+                if (item == "<->") {
+                    return;
+                }
+
+                let itemState = 0;
+                for (let i = 0; i < item.length; i++) {
+                    let c = item.charCodeAt(i);
+                    if (itemState == 0) {
+                        if (c == 0x005F) {
+                            break;
+                        } else
+                            if (c == 0x4E00 || c == 0x4E8C || c == 0x4E09 || c == 0x56DB || c == 0x4E94 || c == 0x516D || c == 0x4E03 || c == 0x516B || c == 0x4E5D) { // '一'～'九'
+                                itemState = 1;
+                            } else
+                                if (c == 0x5341) { // '十'
+                                    itemState = 2;
+                                } else
+                                    if (c == 0x767E) { // '百'
+                                        itemState = 4;
+                                    } else
+                                        if (c == 0x5343) { // '千'
+                                            itemState = 8;
+                                        } else {
+                                            break;
+                                        }
+                    } else {
+                        if (c == 0x005F) {
+                            item = item.substr(0, i) + item.substr(i + 1);
+                            break;
+                        } else
+                            if (c == 0x4E00 || c == 0x4E8C || c == 0x4E09 || c == 0x56DB || c == 0x4E94 || c == 0x516D || c == 0x4E03 || c == 0x516B || c == 0x4E5D) { // '一'～'九'
+                                if ((itemState & 1) != 0) {
+                                    break;
+                                } else {
+                                    itemState |= 1;
+                                }
+                            } else
+                                if (c == 0x5341) { // '十'
+                                    if ((itemState & 2) != 0) {
+                                        break;
+                                    } else {
+                                        itemState |= 2;
+                                        itemState &= ~1;
+                                    }
+                                } else
+                                    if (c == 0x767E) { // '百'
+                                        if ((itemState & 6) != 0) {
+                                            break;
+                                        } else {
+                                            itemState |= 4;
+                                            itemState &= ~1;
+                                        }
+                                    } else
+                                        if (c == 0x5343) { // '千'
+                                            if ((itemState & 14) != 0) {
+                                                break;
+                                            } else {
+                                                itemState |= 8;
+                                                itemState &= ~1;
+                                            }
+                                        } else {
+                                            break;
+                                        }
+                    }
+                }
+
+                item = item.replace(/_/g, " ");
+                let itemBeginningChar = item.charCodeAt(0);
+                let itemEndingChar = (item.length > 1) ? item.charCodeAt(item.length - 1) : 0;
+                if (bufferEnding == 0) {
+                    let itemBeginning;
+                    let c = itemBeginningChar;
+                    if (c == 0x0020) {
+                        itemBeginning = 0;
+                    } else
+                        if (c == 0x0021
+                            || c == 0x002C
+                            || c == 0x002E
+                            || c == 0x003A
+                            || c == 0x003B
+                            || c == 0x003F) {
+                            itemBeginning = 5;
+                        } else
+                            if (c == 0x3001
+                                || c == 0x3002
+                                || c == 0xFF01
+                                || c == 0xFF0C
+                                || c == 0xFF0E
+                                || c == 0xFF1A
+                                || c == 0xFF1B
+                                || c == 0xFF1F) {
+                                itemBeginning = 6;
+                            } else {
+                                itemBeginning = 7;
+                            }
+                    if (itemBeginning == 0
+                        || itemBeginning == 5
+                        || itemBeginning == 6) {
+                        if (buffer.length > 0) {
+                            buffer = buffer.substr(0, buffer.length - 1);
+                        }
+                    }
+                } else {
+                    let itemBeginning;
+                    let c = itemBeginningChar;
+                    if (c == 0x0020) {
+                        itemBeginning = 0;
+                    } else
+                        if (c >= 0x0041 && c <= 0x005A
+                            || c >= 0x0061 && c <= 0x007A
+                            || c >= 0x0100 && c <= 0x0DFF
+                            || c >= 0x0E60 && c <= 0x01FF) {
+                            itemBeginning = 1;
+                        } else
+                            if (c >= 0xFF21 && c <= 0xFF3A
+                                || c >= 0xFF41 && c <= 0xFF5A) {
+                                itemBeginning = 2;
+                            } else
+                                if (c >= 0x0030 && c <= 0x0039) {
+                                    itemBeginning = (bufferEnding == 8 && itemEndingChar == 0) ? 8 : 3;
+                                } else
+                                    if (c >= 0xFF10 && c <= 0xFF19) {
+                                        itemBeginning = (bufferEnding == 9 && itemEndingChar == 0) ? 9 : 4;
+                                    } else
+                                        if (c == 0x0021
+                                            || c == 0x002C
+                                            || c == 0x002E
+                                            || c == 0x003A
+                                            || c == 0x003B
+                                            || c == 0x003F) {
+                                            itemBeginning = 5;
+                                        } else
+                                            if (c == 0x3001
+                                                || c == 0x3002
+                                                || c == 0xFF01
+                                                || c == 0xFF0C
+                                                || c == 0xFF0E
+                                                || c == 0xFF1A
+                                                || c == 0xFF1B
+                                                || c == 0xFF1F) {
+                                                itemBeginning = 6;
+                                            } else {
+                                                itemBeginning = 7;
+                                            }
+                    if (itemBeginning == 1 || bufferEnding == 1 && (itemBeginning == 2
+                        || itemBeginning == 3
+                        || itemBeginning == 4
+                        || itemBeginning == 7)
+                        || bufferEnding == 2 && (itemBeginning == 2)
+                        || bufferEnding == 3 && (itemBeginning == 3
+                            || itemBeginning == 4)
+                        || bufferEnding == 4 && (itemBeginning == 3
+                            || itemBeginning == 4)
+                        || bufferEnding == 5 && (itemBeginning == 2
+                            || itemBeginning == 3
+                            || itemBeginning == 4
+                            || itemBeginning == 7)
+                        || bufferEnding == 8 && (itemBeginning == 3
+                            || itemBeginning == 4)
+                        || bufferEnding == 9 && (itemBeginning == 3
+                            || itemBeginning == 4)) {
+                        buffer += " ";
+                    }
+                }
+                buffer += item;
+                c = (itemEndingChar == 0) ? itemBeginningChar : itemEndingChar;
+                if (c == 0x0020) {
+                    bufferEnding = 0;
+                } else
+                    if (c >= 0x0041 && c <= 0x005A
+                        || c >= 0x0061 && c <= 0x007A
+                        || c >= 0x0100 && c <= 0x0DFF
+                        || c >= 0x0E60 && c <= 0x01FF) {
+                        bufferEnding = 1;
+                    } else
+                        if (c >= 0xFF21 && c <= 0xFF3A
+                            || c >= 0xFF41 && c <= 0xFF5A) {
+                            bufferEnding = 2;
+                        } else
+                            if (c >= 0x0030 && c <= 0x0039) {
+                                bufferEnding = (itemEndingChar == 0) ? 8 : 3;
+                            } else
+                                if (c >= 0xFF10 && c <= 0xFF19) {
+                                    bufferEnding = (itemEndingChar == 0) ? 9 : 4;
+                                } else
+                                    if (c == 0x0021
+                                        || c == 0x002C
+                                        || c == 0x002E
+                                        || c == 0x003A
+                                        || c == 0x003B
+                                        || c == 0x003F) {
+                                        bufferEnding = 5;
+                                    } else
+                                        if (c == 0x3001
+                                            || c == 0x3002
+                                            || c == 0xFF01
+                                            || c == 0xFF0C
+                                            || c == 0xFF0E
+                                            || c == 0xFF1A
+                                            || c == 0xFF1B
+                                            || c == 0xFF1F) {
+                                            bufferEnding = 6;
+                                        } else {
+                                            bufferEnding = 7;
+                                        }
+            }
+
+            // ================================ 録音開始&停止ボタン ================================
+            function disconnectEnded() {
+
+                // 録音の開始
+                resumePauseButton.innerHTML = "録音の開始";
+                resumePauseButton.disabled = false;
+                resumePauseButton.classList.remove("sending");
+            }
+
+            // ================================ 録音中&停止ボタン ================================
+            function feedDataResumeEnded() {
+
+                resumePauseButton.innerHTML = "<br><br>音声データの録音中...<br><br><span class=\"supplement\">クリック → 録音の停止</span>";
+                resumePauseButton.disabled = false;
+                resumePauseButton.classList.add("sending");
+
+            }
+
+            // ================================ 音声認識処理の最中 ================================
+            function resultUpdated(result) {
+
+                try {
+                    let json = JSON.parse(result);
+                } catch (e) {
+                    if (result.indexOf("\x01") == -1) {
+                    } else {
+                        let fields = result.split("\x01");
+                        let fields0 = fields[0].split("|");
+                        bufferEnding = 0;
+                        let i, j;
+                        for (i = 0; i < fields0.length; i++) {
+                            let written = fields0[i];
+                            if ((j = written.indexOf(" ")) != -1) {
+                                written = written.slice(0, j);
+                            }
+                            if ((j = written.indexOf(":")) != -1) {
+                                written = written.slice(0, j);
+                            }
+                            if ((j = written.indexOf("\x03")) != -1) {
+                                written = written.slice(0, j);
+                            }
+                            append_(written);
+                        }
+                    }
+                }
+
+                this.recognitionResultText.innerHTML = buffer;
+            }
+
+            // ================================ 認識処理 ================================
+            function resultFinalized(result) {
+                this.time0 = 0;
+                this.time2 = new Date().getTime() - this.time2;
+                this.confidence = -1.0;
+                try {
+                    let json = JSON.parse(result);
+                    buffer = (json.text) ? sanitize_(json.text) : (json.code != 'o' && json.message);
+                    if (json.results && json.results[0]) {
+                        if (this.time0 == 0) {
+                            this.time0 = json.results[0].endtime;
+                        }
+                        this.confidence = json.results[0].confidence;
+                    }
+                } catch (e) {
+                    if (result.indexOf("\x01") == -1) {
+                    } else {
+                        let fields = result.split("\x01");
+                        let fields0 = fields[0].split("|");
+                        bufferEnding = 0;
+
+                        let i, j;
+                        for (i = 0; i < fields0.length; i++) {
+                            let written = fields0[i];
+                            if ((j = written.indexOf(" ")) != -1) {
+                                written = written.slice(0, j);
+                            }
+                            if ((j = written.indexOf(":")) != -1) {
+                                written = written.slice(0, j);
+                            }
+                            if ((j = written.indexOf("\x03")) != -1) {
+                                written = written.slice(0, j);
+                            }
+                            append_(written);
+                        }
+                        buffer = (buffer) ? sanitize_(buffer) : "<font color=\"gray\">(なし)</font>";
+                        if (this.time0 == 0) {
+                            this.time0 = parseInt(fields[2].split("-")[1]);
+                        }
+                        this.confidence = parseFloat(fields[1]);
+                    }
+                }
+
+
+                // ================================ 書き起こした文字を表示 (コンソールとHTMLに直で) ================================
+                console.log(buffer);
+                this.recognitionResultText.innerHTML = buffer;
+
+                // ================================ Ajax/Axios非同期通信処理 ================================
+                const textRec = () => {
+
+                    // ↓下2行、csrfエラー回避のおまじない
+                    axios.defaults.xsrfCookieName = 'csrftoken'
+                    axios.defaults.xsrfHeaderName = "X-CSRFTOKEN"
+
+                    const data = {
+                        text: buffer
+                    };
+
+                    const params = new URLSearchParams(data);
+
+                    axios.post("{% url 'text:get' %}", params)
+                        .then(function (response) {
+                            console.log("response.data: " + response.data);
+                            console.log(response);
+                            document.querySelector("#status").innerHTML = "axios通信OK!";
+                        })
+                        .catch(function (error) {
+                            console.log(error);
+                        });
+
+                }
+                $("#resumePauseButton").on("click", textRec)
+            }
+
+
+            // ================================================================
+
+            // ここから先は認証情報等なので、じゅんじゅん以外はいじらなくていいかもです
+
+            // ================================================================
+
+
+            // ================================ 認証情報 ================================
+
+            let grammarFileNames = document.getElementsByClassName("grammarFileNames");
+            let issuerURL = 'https://acp-api.amivoice.com/issue_service_authorization';
+            let sid = 'JunJun';
+            let spw = '8qYaMwXTjZ3dNszg';
+            let recognitionResultText = document.getElementsByClassName("recognitionResultText");
+
+            // let grammarFileNames = '-a-general';
+
+            // grammarFileNames[0].value = Wrp.grammarFileNames;
+            // authorization.value = Wrp.authorization;
+
+            issuerURL.value = "https://acp-api.amivoice.com/issue_service_authorization";
+            serverURL.value = "wss://acp-api.amivoice.com/v1/";
+            authorization.value = 'FFFFE8D6D3E73ACF35928DD1A29A24083F7D2CB08E4B2799BCDF00987990D80975';
+            grammarFileNames[0].value = '-a-general';
+
+            // let issuerURL = "https://acp-api.amivoice.com/issue_service_authorization";
+            // let serverURL = "wss://acp-api.amivoice.com/v1/";
+            // let authorization = 'FFFFE8D6D3E73ACF35928DD1A29A24083F7D2CB08E4B2799BCDF00987990D80975';
+            // let grammarFileNames = '-a-general';
+
+            // 音声認識ライブラリのプロパティ要素の設定
+            Wrp.serverURLElement = serverURL;
+            Wrp.grammarFileNamesElement = grammarFileNames[0];
+            Wrp.authorizationElement = authorization;
+            Wrp.issuerURLElement = issuerURL;
+            Wrp.sidElement = sid;
+            Wrp.spwElement = spw;
+            Wrp.name = "";
+            Wrp.recognitionResultText = recognitionResultText[0];
+
+            // 音声認識ライブラリのイベントハンドラの設定
+            Wrp.disconnectEnded = disconnectEnded;
+            Wrp.feedDataResumeEnded = feedDataResumeEnded;
+            Wrp.resultFinalized = resultFinalized;
+
+
+            // 音声認識ライブラリ／録音ライブラリのメソッドの画面要素への登録
+            resumePauseButton.onclick = function () {
+                // 音声認識サーバへの音声データの供給中かどうかのチェック
+                if (Wrp.isActive()) {
+                    // 音声認識サーバへの音声データの供給中の場合...
+                    // 音声認識サーバへの音声データの供給の停止
+                    Wrp.feedDataPause();
+
+                    // ボタンの制御
+                    resumePauseButton.disabled = true;
+                } else {
+                    // 音声認識サーバへの音声データの供給中でない場合...
+                    // グラマファイル名が指定されているかどうかのチェック
+                    // → 接続エンジン名のこと
+                    if (Wrp.grammarFileNamesElement.value != "") {
+
+                        // 音声認識サーバへの音声データの供給の開始
+                        Wrp.feedDataResume();
+
+                        // ボタンの制御
+                        resumePauseButton.disabled = true;
+                    } else {
+
+                    }
+                }
+            };
+
+            let issue_options = document.querySelectorAll(".issue_options");
+            function toggle_issue_options() {
+                issue_options[0].style.display = (issue_options[0].style.display === "") ? "none" : "";
+                for (let i = 1; i < issue_options.length; i++) {
+                    issue_options[i].style.display = issue_options[0].style.display;
+                }
+            }
+            let toggle_issue_optionss = document.querySelectorAll(".toggle_issue_options");
+            for (let i = 0; i < toggle_issue_optionss.length; i++) {
+                toggle_issue_optionss[i].onclick = toggle_issue_options;
+                toggle_issue_optionss[i].style.cursor = "pointer";
+            }
+
+            let options = document.querySelectorAll(".options");
+            function toggle_options() {
+                options[0].style.display = (options[0].style.display === "") ? "none" : "";
+                for (let i = 1; i < options.length; i++) {
+                    options[i].style.display = options[0].style.display;
+                }
+            }
+            let toggle_optionss = document.querySelectorAll(".toggle_options");
+            for (let i = 0; i < toggle_optionss.length; i++) {
+                toggle_optionss[i].onclick = toggle_options;
+                toggle_optionss[i].style.cursor = "pointer";
+            }
+        })();
+    </script>
+</body>
+
+</html>
