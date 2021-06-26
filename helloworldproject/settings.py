@@ -173,7 +173,7 @@ STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'static'),
 )
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 DEBUG = False
 
@@ -183,4 +183,5 @@ except ImportError:
     pass
 
 if not DEBUG:
-    SECRET_KEY = os.environ['SECRET_KEY']
+    SECRET_KEY = 'django-insecure-p=xb4-esgwi1sj4qx36h6l)*bc68)_^sib*i-grj)xak*b^&n='
+    # SECRET_KEY = os.environ['SECRET_KEY']
