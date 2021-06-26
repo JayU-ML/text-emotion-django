@@ -23,6 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
+
 # DEBUG = True
 
 # ALLOWED_HOSTS = ["django-test-junjun.herokuapp.com"]
@@ -156,6 +157,9 @@ except ImportError:
 #     import django_heroku
 #     django_heroku.settings(locals())
 
+# SECRET_KEY = 'django-insecure-p=xb4-esgwi1sj4qx36h6l)*bc68)_^sib*i-grj)xak*b^&n='
+
+# ================================================================
 # 追記 Herokuへのデプロイ用
 # import dj_database_url
 # ↑ なんか自動で上に行っちゃった
