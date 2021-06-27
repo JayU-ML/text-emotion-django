@@ -92,8 +92,8 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 ALLOWED_HOSTS = ['*']
 
-# 追記 高橋さんのところから追加_2021-06-27-20
-DEBUG = False
+# DEBUG = False
+DEBUG = True
 
 try:
     from .local_settings import *
