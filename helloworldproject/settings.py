@@ -92,21 +92,21 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 ALLOWED_HOSTS = ['*']
 
-DEBUG = False
-# DEBUG = True
 
 try:
     from .local_settings import *
 except ImportError:
     pass
 
-if not DEBUG:
-    SECRET_KEY = os.environ['SECRET_KEY']
-    TEXTEMOTION_URL = os.environ['TEXTEMOTION_URL']
-    # VOICETEXT_AUTH = os.environ['VOICETEXT_AUTH']
-    # VOICETEXT_URL = os.environ['VOICETEXT_URL']
-    # VOICETEXT_SID = os.environ['VOICETEXT_SID']
-    # VOICETEXT_SWP = os.environ['VOICETEXT_SWP']
+DEBUG = True
+# DEBUG = False
+
+# if not DEBUG:
+#     SECRET_KEY = os.environ['SECRET_KEY']
+#     TEXTEMOTION_URL = os.environ['TEXTEMOTION_URL']
+
+TEXTEMOTION_URL = 'https://language.googleapis.com/v1/documents:analyzeSentiment?key=AIzaSyCAXFvYgTVg6ivXm6xrT2It3VjzgOFF6no'
+SECRET_KEY = 'django-insecure-p=xb4-esgwi1sj4qx36h6l)*bc68)_^sib*i-grj)xak*b^&n='
 
 # ================================================================
 # 追記 Herokuへのデプロイ用
