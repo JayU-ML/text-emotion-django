@@ -13,6 +13,7 @@
     <!-- JS/CSSの読み込み -->
     <script type="text/javascript" src="{% static '/js/recorder.js' %}"></script>
     <script type="text/javascript" src="{% static '/js/wrp.js' %}"></script>
+    <script type="text/javascript" src="{% static '/js/auth.js' %}"></script>
     <link rel="stylesheet" href="{% static '/css/index.css' %}">
 </head>
 
@@ -434,25 +435,14 @@
             // ================================ 認証情報 ================================
 
             let grammarFileNames = document.getElementsByClassName("grammarFileNames");
-            let issuerURL = 'https://acp-api.amivoice.com/issue_service_authorization';
-            let sid = 'JunJun';
-            let spw = '8qYaMwXTjZ3dNszg';
+            let issuerURL = issuerURLHide;
+            let sid = sidHide;
+            let spw = spwHide;
             let recognitionResultText = document.getElementsByClassName("recognitionResultText");
 
-            // let grammarFileNames = '-a-general';
-
-            // grammarFileNames[0].value = Wrp.grammarFileNames;
-            // authorization.value = Wrp.authorization;
-
-            issuerURL.value = "https://acp-api.amivoice.com/issue_service_authorization";
             serverURL.value = "wss://acp-api.amivoice.com/v1/";
-            authorization.value = 'FFFFE8D6D3E73ACF35928DD1A29A24083F7D2CB08E4B2799BCDF00987990D80975';
+            authorization.value = authorizationHide;
             grammarFileNames[0].value = '-a-general';
-
-            // let issuerURL = "https://acp-api.amivoice.com/issue_service_authorization";
-            // let serverURL = "wss://acp-api.amivoice.com/v1/";
-            // let authorization = 'FFFFE8D6D3E73ACF35928DD1A29A24083F7D2CB08E4B2799BCDF00987990D80975';
-            // let grammarFileNames = '-a-general';
 
             // 音声認識ライブラリのプロパティ要素の設定
             Wrp.serverURLElement = serverURL;

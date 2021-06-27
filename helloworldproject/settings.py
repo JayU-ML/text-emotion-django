@@ -1,7 +1,8 @@
 # import dj_database_url # 追記 Herokuへのデプロイ用
-# import django_heroku
+# import django_heroku # 追記 Herokuへのデプロイ用
 import dj_database_url
 import os
+import subprocess
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -83,14 +84,29 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+STATIC_URL = '/static/'
+STATICFILES_DIRS = (
+    os.path.join(BASE_DIR, 'static'),
+)
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+ALLOWED_HOSTS = ['*']
+
+# 追記 高橋さんのところから追加_2021-06-27-20
+DEBUG = False
 
 try:
-    from config.local_settings import *
+    from .local_settings import *
 except ImportError:
     pass
 
-# ローカルで試すときはここのコメントアウトを外す
-# DEBUG = False
+if not DEBUG:
+    SECRET_KEY = os.environ['SECRET_KEY']
+    TEXTEMOTION_URL = os.environ['TEXTEMOTION_URL']
+    # VOICETEXT_AUTH = os.environ['VOICETEXT_AUTH']
+    # VOICETEXT_URL = os.environ['VOICETEXT_URL']
+    # VOICETEXT_SID = os.environ['VOICETEXT_SID']
+    # VOICETEXT_SWP = os.environ['VOICETEXT_SWP']
 
 # ================================================================
 # 追記 Herokuへのデプロイ用
@@ -98,21 +114,3 @@ except ImportError:
 
 DATABASES["default"] = dj_database_url.config()
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-ALLOWED_HOSTS = ['*']
-
-STATIC_URL = '/static/'
-STATICFILES_DIRS = (
-    os.path.join(BASE_DIR, 'static'),
-)
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
-DEBUG = False
-
-try:
-    from local_settings import *
-except ImportError:
-    pass
-
-if not DEBUG:
-    SECRET_KEY = 'django-insecure-p=xb4-esgwi1sj4qx36h6l)*bc68)_^sib*i-grj)xak*b^&n='
-    # SECRET_KEY = os.environ['SECRET_KEY']
