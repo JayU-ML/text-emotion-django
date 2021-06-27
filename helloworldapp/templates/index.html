@@ -401,8 +401,12 @@
                 const textRec = () => {
 
                     // ↓下2行、csrfエラー回避のおまじない
-                    axios.defaults.xsrfCookieName = 'csrftoken'
-                    axios.defaults.xsrfHeaderName = "X-CSRFTOKEN"
+                    // axios.defaults.xsrfCookieName = 'csrftoken'
+                    // axios.defaults.xsrfHeaderName = "X-CSRFTOKEN"
+
+                    // https://stackoverflow.com/questions/62984293/django-csrf-token-with-axios
+                    axios.defaults.xsrfCookieName = 'csrftoken';
+                    axios.defaults.xsrfHeaderName = 'X-CSRFToken';
 
                     const data = {
                         text: buffer
