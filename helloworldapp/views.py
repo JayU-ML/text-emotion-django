@@ -20,6 +20,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 #     return render(request, 'index.html')
 
 
+@csrf_exempt
 def get(request):
     if request.method == "POST":
 
