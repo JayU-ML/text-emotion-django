@@ -414,7 +414,17 @@
 
                     const params = new URLSearchParams(data);
 
-                    axios.post("{% url 'text:get' %}", params)
+                    axios.post(
+                        "{% url 'text:get' %}",
+                        params,
+                        { xstfCookieName: 'csrftoken' },
+                        { xsrfHeaderName: 'X-CSRFToken' },
+                        {
+                            headers: {
+                                'X-CSRFToken': 'csrftoken',
+                            }
+                        }
+                    )
                         .then(function (response) {
                             console.log("response.data: " + response.data);
                             console.log(response);
@@ -423,6 +433,16 @@
                         .catch(function (error) {
                             console.log(error);
                         });
+
+                    // axios.post("{% url 'text:get' %}", params)
+                    //     .then(function (response) {
+                    //         console.log("response.data: " + response.data);
+                    //         console.log(response);
+                    //         document.querySelector("#status").innerHTML = "axios通信OK!";
+                    //     })
+                    //     .catch(function (error) {
+                    //         console.log(error);
+                    //     });
 
                 }
                 $("#resumePauseButton").on("click", textRec)
