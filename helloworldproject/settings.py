@@ -98,15 +98,15 @@ try:
 except ImportError:
     pass
 
-DEBUG = True
-# DEBUG = False
+# DEBUG = True
+DEBUG = False
 
-# if not DEBUG:
-#     SECRET_KEY = os.environ['SECRET_KEY']
-#     TEXTEMOTION_URL = os.environ['TEXTEMOTION_URL']
+if not DEBUG:
+    SECRET_KEY = os.environ['SECRET_KEY']
+    TEXTEMOTION_URL = os.environ['TEXTEMOTION_URL']
 
-TEXTEMOTION_URL = 'https://language.googleapis.com/v1/documents:analyzeSentiment?key=AIzaSyCAXFvYgTVg6ivXm6xrT2It3VjzgOFF6no'
-SECRET_KEY = 'django-insecure-p=xb4-esgwi1sj4qx36h6l)*bc68)_^sib*i-grj)xak*b^&n='
+# TEXTEMOTION_URL = 'https://language.googleapis.com/v1/documents:analyzeSentiment?key=AIzaSyCAXFvYgTVg6ivXm6xrT2It3VjzgOFF6no'
+# SECRET_KEY = 'django-insecure-p=xb4-esgwi1sj4qx36h6l)*bc68)_^sib*i-grj)xak*b^&n='
 
 # ================================================================
 # 追記 Herokuへのデプロイ用
